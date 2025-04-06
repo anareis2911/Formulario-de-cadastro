@@ -1,54 +1,95 @@
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("formCadastro");
-    const btnLimpar = document.getElementById("btnLimpar");
-
-    // Só executa lógica de cadastro se estiver na página de cadastro
-    if (form && btnLimpar) {
-        btnLimpar.addEventListener("click", () => {
-            form.reset();
-        });
-
-        form.addEventListener("submit", (e) => {
-            e.preventDefault();
-
-            const nome = document.getElementById("nome").value.trim();
-            const email = document.getElementById("email").value.trim();
-            const idade = document.getElementById("idade").value.trim();
-
-            if (!nome || !email || !idade) {
-                alert("Por favor, preencha todos os campos.");
-                return;
-            }
-
-            const novoUsuario = { nome, email, idade };
-            const usuarios = JSON.parse(localStorage.getItem("usuarios") || "[]");
-
-            usuarios.push(novoUsuario);
-            localStorage.setItem("usuarios", JSON.stringify(usuarios));
-
-            alert("Cadastro realizado com sucesso!");
-            form.reset();
-        });
-    }
-
-    // Exibe dados se estiver na página descricao.html
     const tabela = document.querySelector("#tabelaUsuarios tbody");
-    if (tabela) {
-        const usuarios = JSON.parse(localStorage.getItem("usuarios") || "[]");
-
-        if (usuarios.length === 0) {
-            tabela.innerHTML = "<tr><td colspan='3'>Nenhum usuário cadastrado.</td></tr>";
-            return;
-        }
-
-        usuarios.forEach(usuario => {
-            const linha = document.createElement("tr");
-            linha.innerHTML = `
-                <td>${usuario.nome}</td>
-                <td>${usuario.email}</td>
-                <td>${usuario.idade}</td>
-            `;
-            tabela.appendChild(linha);
-        });
+    const inputBusca = document.getElementById("busca");
+  
+    // CADASTRO - index.html
+    if (form) {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+  
+        const nome = document.getElementById("nome").value;
+        const email = document.getElementById("email").value;
+        const idade = document.getElementById("idade").value;
+  
+        fetch("http://localhost:3000/usuarios", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ nome, email, idade })
+        })
+        .then(response => response.json())
+        .then(() => {
+          alert("Usuário cadastrado com sucesso!");
+          form.reset();
+        })
+        .catch(err => console.error("Erro ao cadastrar:", err));
+      });
     }
-});
+  
+    // EXIBIÇÃO - descricao.html
+    if (tabela) {
+      fetchUsuarios();
+  
+      // Busca dinâmica
+      if (inputBusca) {
+        inputBusca.addEventListener("input", (e) => {
+          const termo = e.target.value.toLowerCase();
+          const linhas = tabela.querySelectorAll("tr");
+          linhas.forEach(linha => {
+            const texto = linha.innerText.toLowerCase();
+            linha.style.display = texto.includes(termo) ? "" : "none";
+          });
+        });
+      }
+    }
+  });
+  
+  // Função para buscar usuários do db.json
+  function fetchUsuarios() {
+    fetch("http://localhost:3000/usuarios")
+      .then(res => res.json())
+      .then(usuarios => {
+        const tbody = document.querySelector("#tabelaUsuarios tbody");
+        tbody.innerHTML = "";
+  
+        usuarios.forEach(user => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${user.nome}</td>
+            <td>${user.email}</td>
+            <td>${user.idade}</td>
+            <td>
+              <button class="btn btn-sm btn-secondary" onclick="editarUsuario(${user.id})">Editar</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      });
+  }
+  
+  // Editar usuário via prompt
+  function editarUsuario(id) {
+    fetch(`http://localhost:3000/usuarios/${id}`)
+      .then(res => res.json())
+      .then(usuario => {
+        const novoNome = prompt("Novo nome:", usuario.nome);
+        const novoEmail = prompt("Novo email:", usuario.email);
+        const novaIdade = prompt("Nova idade:", usuario.idade);
+  
+        if (novoNome && novoEmail && novaIdade) {
+          fetch(`http://localhost:3000/usuarios/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nome: novoNome,
+              email: novoEmail,
+              idade: parseInt(novaIdade)
+            })
+          })
+          .then(() => fetchUsuarios());
+        }
+      });
+  }
+  
